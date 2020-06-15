@@ -37,7 +37,7 @@ int main()
 	/* 几何参数 */
 	const double d = 2.3e-3;	//PHP内径，m
 	const double d_out = 3.3e-3;	//PHP外径，m
-	const double film = 1e-4;	//液膜厚度，m
+	const double film = 5.2e-5;	//液膜厚度，m
 	const double A_v = 0.25*pi*pow((d - 2 * film), 2); //气泡截面积，m2
 	const double A_l=4.15476e-6;	//液塞截面积，m2，内径2.3mm的圆
 	const double A_w = 4.39823e-6;	//管壁截面积，m2，内径2.3mm外径3.3mm的圆环
@@ -45,7 +45,7 @@ int main()
 	const double g=9.8;	//重力加速度，m/s2
 	
 	/* 物性参数 */
-	const double ro_l = 61.3;	//液氢密度，kg/m3
+	const double ro_l = 72.26;	//液氢19K密度，kg/m3
 	const double mm = 4124;    //氢气的气体常数EES，J/kg-K
 	const double lamt_w = 2.169;                           /*20K,SS304热导率，W/m-K*/
 	const double c_w = 13.45;                            /*20K,SS304热容,J/kg-K*/
@@ -55,7 +55,7 @@ int main()
 	const double T_max=31;	//温度上限，K
 	/* 管外温度（预留量）*/
 	const double T_out = 20;
-	const double T_c = 18.96;	//固定冷凝端温度，K
+	const double T_c = 19.065;	//固定冷凝端温度，K
 	
 	/* 状态值 */
 	int codenumber = 0;	//0表示正常，1表示（n=1气体开始）液塞移动过快或时间步长过大，2表示（n=1液体开始）液塞移动过快或时间不长过大
@@ -239,7 +239,7 @@ int main()
 			heat_sig[n] = -1;		}
 	}
 	/* 设定气泡过热度，K*/
-	float overheat = 0.3;
+	float overheat = 0.25;
 	/* 设定气泡产生时间间隔*/
 	double generate_fre = 0.05;	//气泡产生的时间间隔，s
 	double generate_inter1 = 0;	//第1个气泡产生点的计时器
@@ -251,15 +251,15 @@ int main()
 	double generate_inter7 = 0;	//第7个气泡产生点的计时器
 	double generate_inter8 = 0;	//第8个气泡产生点的计时器
 	/* 设定产生、消失最小长度*/
-	double l_disappear = 0.1*dx;
+	double l_disappear = 0.2*dx;
 	/* 设定气泡中蒸发与冷凝换热系数*/
 	for (n = 1; n <= length; n = n + 1)
 	{
 		h_v[n] = 0;
 		if (heat_sig[n] == 1)
-		{h_v[n] = 1000;}	//蒸发换热系数1000W/m2-K
+		{h_v[n] = 2028;}	//蒸发换热系数1000W/m2-K
 		if (heat_sig[n] == -1)
-		{h_v[n] = 1000;}	//冷凝换热系数1000W/m2-K
+		{h_v[n] = 2028;}	//冷凝换热系数1000W/m2-K
 	}
 	/* 设定管外冷却换热参数（预留）*/
 	for (n = 1; n <= length; n = n + 1)
@@ -432,7 +432,7 @@ int main()
 	for (n=1;n<=length;n=n+1)
 	{
 		if (heat_sig[n]==1)
-		{T_w[n][1]=T_c+0.2;}	//蒸发段壁面温度，高于其他部分壁面温度
+		{T_w[n][1]=19.67;}	//蒸发段壁面温度，高于其他部分壁面温度
 	}
 	/*初始化液体单相对流换热系数*/
 	double Re_lleft[length+1],Re_lright[length+1],f,Pr;
@@ -1890,6 +1890,7 @@ int main()
 		double G_force[100];	//液塞重力，N/m2
 		double l[100];	//液塞长度？
 		double C_ll;	//液塞总阻力系数，大于0表示向右，小于0表示向左
+		double K;	//弯头阻力系数
 
 		/*******对于起始点（n=1）状态的分类讨论：第一部分：气或者气-液，此时液塞序号领先于气泡序号*********/
 		/*******计算各液塞的质量变化和重力作用、液塞总长度、速度、温度*********/
@@ -1913,6 +1914,7 @@ int main()
 				G_force[n_liquid]=0;	//重力初始化为0
 				l[n_liquid]=0;
 				C_ll=0;
+				K=0;
 				G_force[n_liquid]=G_force[n_liquid]+ro_l*g*c_gravity[n]*x_lright[n][1];	//将每个控制体的重力累加，x_lright[n][1]
 				l[n_liquid]=l[n_liquid]+x_lright[n][1];	//将每个控制体的液体长度累加，x_lright[n][1]
 				Re_lright[n]=d*ro_l*fabs(v_lright[n][1])/mu_right[n];	//控制体雷诺数，v_lright[n][1]
@@ -1922,6 +1924,9 @@ int main()
 					{C_l[n]=16/Re_lright[n];}
 				else
 					{C_l[n]=0.078*pow(Re_lright[n],-0.2);}
+				if((Re_lright[n]>0)&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+					{K=1000/Re_lright[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+					C_l[n]=C_l[n]+K/4*2.3/110;}
 				if (v_lright[n_trans[2*n_liquid-1]][1]>0)	//左界面速度大于0，即向正方向运动
 					{C_l[n]=-C_l[n];}	//阻力系数为负，即阻力指向负方向
 				C_ll=C_ll+C_l[n]*x_lright[n][1];	//控制体阻力系数乘以液体长度累加到总阻力系数
@@ -1938,7 +1943,9 @@ int main()
 						{C_l[n]=16/Re_lleft[n];}
 					else
 						{C_l[n]=0.078*pow(Re_lleft[n],-0.2);}
-
+					if((Re_lleft[n]>0)&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+						{K=1000/Re_lleft[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+						C_l[n]=C_l[n]+K/4*2.3/110;}
 					if (v_lleft[n_trans[2*n_liquid-1]][1]>0)
 						{C_l[n]=-C_l[n];}
 					C_ll=C_ll+C_l[n]*x_lleft[n][1];
@@ -2361,6 +2368,7 @@ int main()
 			G_force[n_liquid]=0;
 			l[n_liquid]=0;
 			C_ll=0;
+			K=0;
         
 			G_force[n_liquid]=G_force[n_liquid]+ro_l*g*c_gravity[n]*x_lright[n][1];	//各控制体的重力累加
 			l[n_liquid]=l[n_liquid]+x_lright[n][1];
@@ -2371,6 +2379,9 @@ int main()
 				{C_l[n]=16/Re_lright[n];}
 			else 
 				{C_l[n]=0.078*pow(Re_lright[n],-0.2);}
+			if(Re_lright[n]>0&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+				{K=1000/Re_lright[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+				C_l[n]=C_l[n]+K/4*2.3/110;}
 			if (v_lright[n_trans[2*n_liquid-1]][1]>0)	//速度向右则阻力向左
 				{C_l[n]=-C_l[n];}
 			C_ll=C_ll+C_l[n]*x_lright[n][1];	//液塞的阻力系数为各控制体阻力系数的加权平均
@@ -2388,6 +2399,9 @@ int main()
 					{C_l[n]=16/Re_lleft[n];}
 				else 
 					{C_l[n]=0.078*pow(Re_lleft[n],-0.2);}
+				if(Re_lleft[n]>0&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+					{K=1000/Re_lleft[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+					C_l[n]=C_l[n]+K/4*2.3/110;}
 				if (v_lleft[n_trans[2*n_liquid-1]][1]>0)
 					{C_l[n]=-C_l[n];}
 				C_ll=C_ll+C_l[n]*x_lleft[n][1];
@@ -2406,6 +2420,9 @@ int main()
 					{C_l[n]=16/Re_lleft[n];}
 				else 
 					{C_l[n]=0.078*pow(Re_lleft[n],-0.2);}
+				if(Re_lleft[n]>0&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+					{K=1000/Re_lleft[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+					C_l[n]=C_l[n]+K/4*2.3/110;}
 				if (v_lleft[n_trans[2*n_liquid-1]][1]>0)
 					{C_l[n]=-C_l[n];}
 				C_ll=C_ll+C_l[n]*x_lleft[n][1];
@@ -3291,6 +3308,7 @@ int main()
 				G_force[n_liquid]=0;
 				l[n_liquid]=0;
 				C_ll=0;
+				K=0;
              
 				G_force[n_liquid]=G_force[n_liquid]+ro_l*g*c_gravity[n]*x_lright[n][1];	//各控制体重力累加
 				l[n_liquid]=l[n_liquid]+x_lright[n][1];	//各控制体液体长度用x_lright[n][1]表示
@@ -3301,6 +3319,9 @@ int main()
 					{C_l[n]=16/Re_lright[n];}
 				else
 					{C_l[n]=0.078*pow(Re_lright[n],-0.2);}
+				if(Re_lright[n]>0&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+					{K=1000/Re_lright[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+					C_l[n]=C_l[n]+K/4*2.3/110;}
 				if (v_lleft[n][1]>0)
 					{C_l[n]=-C_l[n];}
 				C_ll=C_ll+C_l[n]*x_lright[n][1];	//阻力系数先加权累加
@@ -3317,6 +3338,9 @@ int main()
 						{C_l[n]=16/Re_lleft[n];}
 					else
 						{C_l[n]=0.078*pow(Re_lleft[n],-0.2);}
+					if(Re_lright[n]>0&&(n%210>=101)&&(n%210<=210))	//弯头处的阻力损失
+					{K=1000/Re_lleft[n]+0.1*(1+4/pow(2.3/25.4,0.3));
+					C_l[n]=C_l[n]+K/4*2.3/110;}
 					if (v_lleft[n][1]>0)
 						{C_l[n]=-C_l[n];}
 					C_ll=C_ll+C_l[n]*x_lleft[n][1];	//阻力系数加权累加
